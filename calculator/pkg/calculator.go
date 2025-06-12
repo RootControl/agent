@@ -1,7 +1,9 @@
 package pkg
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -37,12 +39,41 @@ func (c *Calculator) Evaluate(expression string) (float64, error) {
 }
 
 func (c *Calculator) evaluateInfix(tokens []string) (float64, error) {
-	var values []*float64
+	var values []float64
 	var operators []string
 
 	for _, token := range tokens {
+		if _, isOperator := c.Operators[token]; isOperator {
+			for len(operators) > 0 &&
+				c.Operators[operators[len(operators)-1]] != nil &&
+				c.Precedence[operators[len(operators)-1]] >= c.Precedence[token] {
+				if err := c.applyOperator(&operators, &values); err != nil {
+					return 0, err
+				}
+			}
 
+			operators = append(operators, token)
+		} else {
+			num, err := strconv.ParseFloat(token, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid token: %s", token)
+			}
+
+			values = append(values, num)
+		}
 	}
+
+	for len(operators) > 0 {
+		if err := c.applyOperator(&operators, &values); err != nil {
+			return 0, err
+		}
+	}
+
+	if len(values) != 1 {
+		return 0, errors.New("invalid expression")
+	}
+
+	return values[0], nil
 }
 
 func (c *Calculator) applyOperator(operators *[]string, values *[]float64) error {
